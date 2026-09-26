@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/* Rebranded to match the LinkedOut door mark (see app/icon.png): a dark
+   navy base with a vivid blue accent, replacing the earlier mustard/
+   cream "redacted document" palette. Dark is the default (matches the
+   logo, which is designed for a dark background, and is what renders
+   before any client-side theme detection runs, avoiding a flash of the
+   wrong theme). :root[data-theme="light"] below overrides these for
+   light mode. See lib/theme-context.js for how data-theme gets set, and
+   the inline script in app/layout.js for why it's set before hydration,
+   not after. */
+:root {
+  --lo-ink: #0C1423;
+  --lo-surface: #141E33;
+  --lo-surface2: #1C2740;
+  --lo-line: #2E3A56;
+  --lo-paper: #E8E1CE;
+  --lo-corpblue: #4E6E9E;
+  --lo-flag: #C1483B;
+  --lo-green: #5C8A5C;
+  --lo-mustard: #4C61FF;
+  --lo-text: #EDEAE3;
+  --lo-muted: #909BB8;
+  --lo-sunken: rgba(0, 0, 0, 0.16);
+  --lo-grain: rgba(255, 255, 255, 0.035);
+  color-scheme: dark;
+
+  --background: var(--lo-ink);
+  --foreground: var(--lo-text);
+}
+
+:root[data-theme="light"] {
+  --lo-ink: #F4F6FB;
+  --lo-surface: #FFFFFF;
+  --lo-surface2: #EAEEF7;
+  --lo-line: #D8DEEC;
+  --lo-paper: #E8E1CE;
+  --lo-corpblue: #3E5A82;
+  --lo-flag: #A63B2E;
+  --lo-green: #43734A;
+  /* The accent (still internally named --lo-mustard — a leftover
+     identifier, not user-facing) is deliberately IDENTICAL in both
+     themes: it's used as a button fill paired with white text
+     throughout the app (see the many `color: "#FFFFFF"` pairings next to
+     `background: C.mustard`). If it changed between themes, those
+     buttons would risk losing contrast in whichever theme it drifted
+     toward. One consistent brand blue avoids that whole class of bug. */
+  --lo-mustard: #4C61FF;
+  --lo-text: #141B2E;
+  --lo-muted: #626C85;
+  --lo-sunken: rgba(0, 0, 0, 0.055);
+  --lo-grain: rgba(0, 0, 0, 0.035);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--lo-font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* ------------------------------------------------------------------
+   Motion system — the app previously had almost no interaction
+   feedback: buttons and links snapped between states instantly and
+   nothing acknowledged a tap. These rules apply globally (not just to
+   components that opt in), so every button, link, and themed surface
+   in the app gets a baseline of feedback without every component
+   needing to hand-roll its own hover/active styles.
+   ------------------------------------------------------------------ */
+
+/* Any themed surface (uses the CSS-var palette) eases smoothly when the
+   theme toggles, instead of the whole app hard-cutting between light
+   and dark. */
+button, a, input, textarea, select,
+[class*="surface"], [data-lo-surface] {
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease, opacity 0.18s ease;
+}
+
+/* Baseline pressed/hover feedback for every real and ARIA button, so
+   "nothing acknowledges a tap" stops being true anywhere in the app.
+   Components can still override with more specific motion. */
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button:not(:disabled):active, [role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.96);
+}
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover, a:hover, [role="button"]:not([aria-disabled="true"]):hover {
+    filter: brightness(1.1);
+  }
+  button:not(:disabled):hover {
+    box-shadow: 0 0 0 3px var(--lo-surface2);
+  }
+}
+button:disabled, [aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--lo-mustard);
+  outline-offset: 2px;
+}
+
+/* Route-level transition — wraps each page's content (see
+   components/RouteTransition.jsx) so navigating between tabs/pages
+   fades and lifts in instead of popping instantaneously. */
+.lo-route-enter {
+  animation: lo-fade-up 0.22s ease both;
+}
+
+/* Generic entrance for cards/list items appearing (new post arriving,
+   modal content mounting, etc). */
+.lo-enter {
+  animation: lo-fade-up 0.22s ease both;
+}
+
+/* Skeleton shimmer for loading states, replacing plain "loading…" text
+   pops with something that reads as active progress. */
+.lo-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--lo-surface2);
+  border-radius: 8px;
+}
+.lo-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--lo-line), transparent);
+  animation: lo-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes lo-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+/* Toast / inline-notice slide-in (see components/Toast.jsx) */
+@keyframes lo-toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.lo-toast {
+  animation: lo-toast-in 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+/* Scale-tap helper for elements that need a slightly stronger press
+   response than the global button rule (primary CTAs, reaction icons). */
+.lo-tap:active {
+  transform: scale(0.94);
+}
+
+@keyframes lo-pulse {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes lo-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes lo-spin {
+  to { transform: rotate(360deg); }
+}
+.lo-spin {
+  animation: lo-spin 0.7s linear infinite;
+}
+
+/* Respect reduced-motion preferences: keep the state changes, drop the
+   animated journey between them. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
