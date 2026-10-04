@@ -1,0 +1,70 @@
+"use client";
+import { useEffect, useState, useRef } from "react";
+import { C, displayFont } from "@/lib/theme";
+import { adminApi } from "@/components/admin/adminApi";
+import Link from "next/link";
+import { Stat, Sparkline, card, Pill } from "@/components/admin/ui";
+
+const K = [
+  ["Total users", "totalUsers"], ["Daily active", "dau"], ["Monthly active", "mau"], ["Online now", "onlineNow"], ["Signups today", "newToday"], ["Signups this week", "newWeek"],
+  ["Posts today", "postsToday"], ["Reposts today", "repostsToday"], ["Replies today", "commentsToday"], ["Likes today", "likesToday"], ["Reactions today", "reactionsToday"], ["Messages today", "messagesToday"], ["Media uploads today", "mediaToday"],
+  ["Reports today", "reportsToday"], ["Reports pending", "reportsPending", "flag"], ["Appeals pending", "appealsPending"], ["Verifications pending", "verificationPending"],
+  ["Suspended", "suspended"], ["Restricted", "restricted"], ["Locked", "locked"], ["Content removed", "contentRemoved"], ["Spam flagged", "spamFlagged"],
+  ["Subscribers", "subscribers"], ["MRR (est. $)", "mrrEstimate"],
+];
+const CH = [["Posts / min", "posts"], ["Reposts / min", "reposts"], ["Likes / min", "likes"], ["Reactions / min", "reactions"], ["Replies / min", "replies"]];
+
+export default function CommandCenter() {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState("");
+  const timer = useRef();
+  useEffect(() => {
+    let dead = false;
+    const load = () => adminApi.get("overview").then((x) => { if (!dead) { setD(x); setErr(""); } }).catch((e) => !dead && setErr(e.message));
+    load(); timer.current = setInterval(load, 5000);
+    return () => { dead = true; clearInterval(timer.current); };
+  }, []);
+  if (err && !d) return <p style={{ color: C.flag }}>{err}</p>;
+  if (!d) return <p style={{ color: C.muted }}>Loading…</p>;
+  const h = d.health;
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        <h1 style={{ ...displayFont, fontSize: 24, margin: 0 }}>Command Center</h1>
+        <div style={{ fontSize: 12, color: C.muted }}><span style={{ color: C.green }}>● LIVE</span> · DB {h.dbLatencyMs}ms · {h.status} · uptime {Math.round(h.uptimeSec / 60)}m · refreshes every 5s</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10, marginBottom: 14 }}>
+        {CH.map(([l, k]) => (
+          <div key={k} style={card}>
+            <div style={{ fontSize: 13, display: "flex", justifyContent: "space-between" }}>{l}<b>{d.series[k].slice(-1)[0] ?? 0}</b></div>
+            <Sparkline data={d.series[k]} />
+            <div style={{ fontSize: 11, color: C.muted }}>last 30 min</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 10, marginBottom: 14 }}>
+        <div style={card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Needs attention</div>
+          {[["Open reports", d.attention.reports, "reports"], ["Pending appeals", d.attention.appeals, "appeals"], ["Verification requests", d.attention.verification, "verification"], ["Unassigned tickets", d.attention.support, "support"], ["Ads awaiting review", d.attention.adreview, "adreview"], ["DM abuse reports", d.attention.dm, "dm"], ["Company claims", d.attention.companies, "companies"], ["DMCA notices", d.attention.dmca, "dmca"], ["Legal requests", d.attention.legal, "legal"]].map(([l, n, href]) => (
+            <Link key={l} href={`/admin/${href}`} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13, textDecoration: "none", color: C.text, borderTop: `1px solid ${C.line}` }}><span>{l}</span><b style={{ color: n > 0 ? C.flag : C.muted }}>{n}</b></Link>
+          ))}
+        </div>
+        <div style={card}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Daily active users · 14 days</div>
+          <Sparkline data={d.trends.dau} height={64} />
+          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 10 }}>New signups · 14 days</div>
+          <Sparkline data={d.trends.signups} height={64} />
+          <div style={{ fontSize: 11, color: C.muted }}>{d.trends.days[0]} → {d.trends.days[13]}</div>
+        </div>
+        <div style={card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Recent staff activity</div>
+          {d.recent.length === 0 && <div style={{ color: C.muted, fontSize: 13 }}>Nothing yet.</div>}
+          {d.recent.map((r, i) => <div key={i} style={{ fontSize: 12.5, padding: "4px 0", borderTop: i ? `1px solid ${C.line}` : "none" }}><b>{r.who}</b> <span style={{ color: C.muted }}>{r.action} {r.target}</span><div style={{ fontSize: 10.5, color: C.muted }}>{String(r.at).slice(0, 16).replace("T", " ")}</div></div>)}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 10 }}>
+        {K.map(([l, k, tone]) => <Stat key={k} label={l} value={d.kpis[k]} tone={tone && d.kpis[k] > 0 ? C[tone] : undefined} />)}
+      </div>
+    </div>
+  );
+}
