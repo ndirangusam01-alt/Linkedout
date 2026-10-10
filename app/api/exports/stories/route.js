@@ -1,0 +1,16 @@
+import { exportOwnStories, exportOwnStoriesFull, toCsv } from "@/lib/stories/analytics";
+import { requireViewer, json, fail, planRequired } from "@/lib/stories/http";
+import { getAnonymousIdsForAccount } from "@/lib/identity/service";
+// Export your own stories (full text) or your story analytics. OUT PRO.  ?kind=stories|analytics  &format=csv|json
+export async function GET(request) {
+  const v = await requireViewer(); if (v.error) return v.error;
+  if (!v.perks.exports) return planRequired("Exports", "OUT PRO");
+  const u = new URL(request.url); const kind = u.searchParams.get("kind") === "analytics" ? "analytics" : "stories"; const fmt = u.searchParams.get("format") === "json" ? "json" : "csv";
+  try {
+    const keys = await getAnonymousIdsForAccount(v.accountId);
+    const rows = kind === "analytics" ? await exportOwnStories(keys) : await exportOwnStoriesFull(keys);
+    if (fmt === "json") return new Response(JSON.stringify(rows, null, 2), { headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="linkedout-${kind}.json"` } });
+    const cols = rows.length ? Object.keys(rows[0]) : [];
+    return new Response(toCsv(cols, rows), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="linkedout-${kind}.csv"` } });
+  } catch (e) { return fail(e); }
+}
